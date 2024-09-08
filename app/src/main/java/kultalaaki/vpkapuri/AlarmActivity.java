@@ -11,18 +11,10 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.net.Uri;
+import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.preference.PreferenceManager;
-
-import androidx.constraintlayout.widget.ConstraintLayout;
-import androidx.constraintlayout.widget.ConstraintSet;
-import androidx.core.content.FileProvider;
-import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentTransaction;
-import androidx.appcompat.app.AppCompatActivity;
-
-import android.os.Bundle;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.Gravity;
@@ -32,6 +24,13 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.constraintlayout.widget.ConstraintSet;
+import androidx.core.content.FileProvider;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -39,13 +38,21 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
+import kultalaaki.vpkapuri.Fragments.AlarmButtonsFragment;
+import kultalaaki.vpkapuri.Fragments.AlarmFragment;
+import kultalaaki.vpkapuri.Fragments.AnswerOHTOFragment;
+import kultalaaki.vpkapuri.Fragments.ResponderFragment;
+import kultalaaki.vpkapuri.Fragments.StationboardButtonsFragment;
+import kultalaaki.vpkapuri.Fragments.WebviewFragment;
+import kultalaaki.vpkapuri.services.SMSBackgroundService;
+
 
 public class AlarmActivity extends AppCompatActivity
         implements AlarmButtonsFragment.Listener, StationboardButtonsFragment.OnFragmentInteractionListener, AlarmFragment.Listener, AnswerOHTOFragment.OnFragmentInteractionListener, ResponderFragment.OnFragmentInteractionListener {
 
     static final int REQUEST_IMAGE_CAPTURE = 1;
 
-    boolean koneluku, autoAukaisu, asemataulu, responderFragmentShowing;
+    boolean koneluku, asemataulu, responderFragmentShowing;
     private String action, type, currentPhotoPath;
     SharedPreferences preferences;
     FragmentManager fragmentManager;
@@ -70,7 +77,6 @@ public class AlarmActivity extends AppCompatActivity
         action = intent.getAction();
         type = intent.getType();
         koneluku = preferences.getBoolean("koneluku", false);
-        autoAukaisu = preferences.getBoolean("automaticOpen", false);
 
         constraintLayout = findViewById(R.id.activity_halytys);
     }
@@ -104,7 +110,7 @@ public class AlarmActivity extends AppCompatActivity
     }
 
     public void changeLayout() {
-        if(findViewById(R.id.responder_view) == null) {
+        if (findViewById(R.id.responder_view) == null) {
             constraintSet = new ConstraintSet();
             //constraintSet.clone(constraintLayout);
             constraintSet.load(this, R.layout.halytys_activity_ohto);
@@ -147,7 +153,6 @@ public class AlarmActivity extends AppCompatActivity
     }
 
 
-
     public void loadAsematauluButtons() {
         FragmentManager fragmentManager = this.getSupportFragmentManager();
         StationboardButtonsFragment stationboardButtonsFragment = new StationboardButtonsFragment();
@@ -166,19 +171,18 @@ public class AlarmActivity extends AppCompatActivity
     @SuppressLint("ApplySharedPref")
     public void loadResponderFragment() {
         responderFragmentShowing = preferences.getBoolean("responderFragmentShowing", false);
-        if(!responderFragmentShowing) {
+        if (!responderFragmentShowing) {
             FragmentManager fragmentManager = this.getSupportFragmentManager();
             ResponderFragment responderFragment = new ResponderFragment();
             FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
             if (findViewById(R.id.responder_view) != null) {
                 fragmentTransaction.replace(R.id.responder_view, responderFragment, "ResponderFragment").commit();
-                preferences.edit().putBoolean("responderFragmentShowing", true).commit();
             } else {
                 fragmentTransaction.setCustomAnimations(R.animator.slide_in_down, R.animator.slide_out_down);
                 fragmentTransaction.addToBackStack(null);
                 fragmentTransaction.replace(R.id.HalytysYlaosa, responderFragment, "ResponderFragment").commit();
-                preferences.edit().putBoolean("responderFragmentShowing", true).commit();
             }
+            preferences.edit().putBoolean("responderFragmentShowing", true).commit();
         }
     }
 
@@ -187,22 +191,8 @@ public class AlarmActivity extends AppCompatActivity
         AlarmFragment alarmFragment = new AlarmFragment();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
         fragmentTransaction.setCustomAnimations(R.animator.slide_in_down, R.animator.slide_out_down);
-        //fragmentTransaction.setCustomAnimations(R.animator.slide_in_left, R.animator.slide_out_right);
         fragmentTransaction.add(R.id.HalytysYlaosa, alarmFragment, "alarmFragment").commit();
     }
-
-    /*public void loadManpowerFragment() {
-        FragmentManager fragmentManager = this.getSupportFragmentManager();
-        ManpowerFragment manpowerFragment = new ManpowerFragment();
-        FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-        //fragmentTransaction.setCustomAnimations(R.animator.slide_in_left, R.animator.slide_out_right);
-        fragmentTransaction.addToBackStack(null);
-        if(findViewById(R.id.responder_view) != null) {
-            fragmentTransaction.replace(R.id.responder_view, manpowerFragment, "manpowerFragment").commit();
-        } else {
-            fragmentTransaction.replace(R.id.HalytysYlaosa, manpowerFragment, "manpowerFragment").commit();
-        }
-    }*/
 
     public void loadhalytysButtonsFragment() {
         FragmentManager fragmentManager = this.getSupportFragmentManager();
@@ -214,34 +204,16 @@ public class AlarmActivity extends AppCompatActivity
 
     public void waitForFragment() {
         Handler handler1 = new Handler();
-        handler1.postDelayed(new Runnable() {
-            public void run() {
-                AlarmFragment alarmFragment = (AlarmFragment)
-                        getSupportFragmentManager().findFragmentByTag("alarmFragment");
-                //Log.i("AlarmActivity", alarmFragment.toString());
-                if (alarmFragment != null) {
-                    alarmFragment.txtToSpeech();
-                }
-                AlarmButtonsFragment alarmButtonsFragment = (AlarmButtonsFragment)
-                        getSupportFragmentManager().findFragmentByTag("alarmButtonsFragment");
-                if (alarmButtonsFragment != null) {
-                    alarmButtonsFragment.setTextHiljennaPuhe();
-                }
+        handler1.postDelayed(() -> {
+            AlarmFragment alarmFragment = (AlarmFragment)
+                    getSupportFragmentManager().findFragmentByTag("alarmFragment");
+            if (alarmFragment != null) {
+                alarmFragment.txtToSpeech();
             }
-        }, 1000);
-        action = null;
-        type = null;
-    }
-
-    public void waitForButtonsFragment() {
-        Handler handler2 = new Handler();
-        handler2.postDelayed(new Runnable() {
-            public void run() {
-                AlarmButtonsFragment alarmButtonsFragment = (AlarmButtonsFragment)
-                        getSupportFragmentManager().findFragmentByTag("alarmButtonsFragment");
-                if (alarmButtonsFragment != null) {
-                    alarmButtonsFragment.autoAukaisu();
-                }
+            AlarmButtonsFragment alarmButtonsFragment = (AlarmButtonsFragment)
+                    getSupportFragmentManager().findFragmentByTag("alarmButtonsFragment");
+            if (alarmButtonsFragment != null) {
+                alarmButtonsFragment.setTextHiljennaPuhe();
             }
         }, 1000);
         action = null;
@@ -253,21 +225,18 @@ public class AlarmActivity extends AppCompatActivity
 
         if (Intent.ACTION_SEND.equals(action) && type != null) {
             if ("text/plain".equals(type)) {
-                Intent stopAlarm = new Intent(AlarmActivity.this, IsItAlarmService.class);
+                Intent stopAlarm = new Intent(AlarmActivity.this, SMSBackgroundService.class);
                 AlarmActivity.this.stopService(stopAlarm);
-                if (koneluku && !autoAukaisu) {
+                if (koneluku) {
                     waitForFragment();
                 }
-            } else if ("automaattinen".equals(type)) {
-                preferences.edit().putBoolean("showHiljenna", true).commit();
-                waitForButtonsFragment();
             }
         }
     }
 
     /**
-     * StationboardButtonsFragment methods below this
-     *
+     * StationboardButtonsFragment methods
+     * <p>
      * <--Methods to take picture and add it to gallery-->
      * openCamera
      * createImageFile

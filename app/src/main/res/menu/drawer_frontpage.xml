@@ -14,10 +14,6 @@
             android:icon="@drawable/ic_whatshot_white_36dp"
             android:title="@string/testi" />
         <item
-            android:id="@+id/check_settings"
-            android:icon="@drawable/ic_stat_name"
-            android:title="@string/tarkista_asetukset" />
-        <item
             android:id="@+id/hiljenna_halyt"
             android:icon="@drawable/ic_volume_off_white_36dp"
             android:title="@string/hiljenna" />
@@ -37,6 +33,10 @@
             android:id="@+id/palautetta"
             android:icon="@drawable/ic_contact_mail_white_36dp"
             android:title="@string/palaute" />
+        <item
+            android:id="@+id/check_update"
+            android:icon="@drawable/ic_settings_applications_white_36dp"
+            android:title="@string/check_updates" />
     </group>
     <group
         android:id="@+id/menuBottom"
@@ -49,6 +49,10 @@
             android:id="@+id/tallennatietokanta"
             android:icon="@drawable/ic_save_white_36dp"
             android:title="@string/tallenna_tietokanta" />
+        <item
+            android:id="@+id/palautatietokanta"
+            android:icon="@drawable/ic_whatshot_white_36dp"
+            android:title="@string/palauta_tietokanta" />
     </group>
     <group>
         <item

@@ -11,73 +11,97 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.ActivityOptions;
 import android.app.AlertDialog;
-import android.app.Dialog;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.TimePickerDialog;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
-import android.os.Build;
+import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.preference.PreferenceManager;
-import androidx.annotation.NonNull;
-import com.google.android.material.navigation.NavigationView;
-import androidx.core.app.ActivityCompat;
-import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentTransaction;
-import androidx.core.content.ContextCompat;
-import androidx.core.view.GravityCompat;
-import androidx.drawerlayout.widget.DrawerLayout;
-import androidx.appcompat.app.ActionBar;
-import androidx.appcompat.app.AppCompatActivity;
-
-import android.os.Bundle;
-
-import androidx.appcompat.widget.Toolbar;
-
+import android.provider.DocumentsContract;
 import android.text.format.DateFormat;
-import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.TimePicker;
 import android.widget.Toast;
 
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
+import androidx.core.view.GravityCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
+
+import com.google.android.material.navigation.NavigationView;
 import com.google.firebase.analytics.FirebaseAnalytics;
 import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.Objects;
+
+import kultalaaki.vpkapuri.Fragments.AffirmationFragment;
+import kultalaaki.vpkapuri.Fragments.ArchiveFragment;
+import kultalaaki.vpkapuri.Fragments.ArchivedAlarmFragment;
+import kultalaaki.vpkapuri.Fragments.ChangelogFragment;
+import kultalaaki.vpkapuri.Fragments.FrontpageFragment;
+import kultalaaki.vpkapuri.Fragments.GuidelineFragment;
+import kultalaaki.vpkapuri.Fragments.SaveToArchiveFragment;
+import kultalaaki.vpkapuri.Fragments.SetTimerFragment;
+import kultalaaki.vpkapuri.Fragments.TimerFragment;
+import kultalaaki.vpkapuri.databasebackupandrestore.FireAlarmJSONWriter;
+import kultalaaki.vpkapuri.databasebackupandrestore.JSONArrayReader;
+import kultalaaki.vpkapuri.dbfirealarm.FireAlarm;
+import kultalaaki.vpkapuri.dbfirealarm.FireAlarmRepository;
+import kultalaaki.vpkapuri.misc.DBTimer;
+import kultalaaki.vpkapuri.misc.SoundControls;
+import kultalaaki.vpkapuri.services.SMSBackgroundService;
+import kultalaaki.vpkapuri.util.Constants;
+import kultalaaki.vpkapuri.util.MyNotifications;
+import kultalaaki.vpkapuri.versioncheck.VersionDataProcessor;
+import kultalaaki.vpkapuri.versioncheck.VersionInfo;
 
 
-public class FrontpageActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback, AffirmationFragment.Listener, FrontpageFragment.OnFragmentInteractionListener,
-        ArchiveFragment.OnFragmentInteractionListener, GuidelineFragment.OnFragmentInteractionListener, SaveToArchiveFragment.OnFragmentInteractionListener,
-        ArchivedAlarmFragment.OnFragmentInteractionListener, TimerFragment.OnFragmentInteractionListener, SetTimerFragment.OnFragmentInteractionListener,
-        TimePickerDialog.OnTimeSetListener {
+public class FrontpageActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback, AffirmationFragment.Listener, FrontpageFragment.OnFragmentInteractionListener, ArchiveFragment.OnFragmentInteractionListener, GuidelineFragment.OnFragmentInteractionListener, SaveToArchiveFragment.OnFragmentInteractionListener, ArchivedAlarmFragment.OnFragmentInteractionListener, TimerFragment.OnFragmentInteractionListener, SetTimerFragment.OnFragmentInteractionListener, TimePickerDialog.OnTimeSetListener {
 
     private static final int MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE_SETTINGS = 3;
-    private static final int CREATE_FILE = 1;
     private FirebaseAnalytics mFirebaseAnalytics;
     private DrawerLayout mDrawerLayout;
     String[] emailAddress;
     String emailSubject;
     DBTimer dbTimer;
     SharedPreferences preferences;
-    boolean ericaEtusivu, analytics, asemataulu;
+    boolean analytics, asemataulu;
     SoundControls soundControls;
     FragmentManager fragmentManager;
 
+    Handler mHandler = new Handler();
 
+    private VersionInfo newestVersion = null;
+
+
+    @SuppressLint("NonConstantResourceId")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -94,7 +118,7 @@ public class FrontpageActivity extends AppCompatActivity implements ActivityComp
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         ActionBar actionbar = getSupportActionBar();
-        if(actionbar != null) {
+        if (actionbar != null) {
             actionbar.setDisplayHomeAsUpEnabled(true);
             actionbar.setHomeAsUpIndicator(R.drawable.ic_dehaze_white_36dp);
         }
@@ -105,90 +129,54 @@ public class FrontpageActivity extends AppCompatActivity implements ActivityComp
 
         // Setting Firebase
         mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
-        FirebaseCrashlytics mFirebaseCrashlytics = FirebaseCrashlytics.getInstance();
-        mFirebaseCrashlytics.setCrashlyticsCollectionEnabled(analytics);
+        FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(analytics);
         mFirebaseAnalytics.setAnalyticsCollectionEnabled(analytics);
 
         final NavigationView navigationView = findViewById(R.id.nav_view);
-        navigationView.setNavigationItemSelectedListener(
-                new NavigationView.OnNavigationItemSelectedListener() {
-                    @Override
-                    public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {
+        navigationView.setNavigationItemSelectedListener(menuItem -> {
 
-                        mDrawerLayout.closeDrawers();
-                        switch(menuItem.getItemId()) {
-                            case R.id.tallenna_arkistoon_haly:
-                                loadTallennaArkistoonFragment();
-                                //startTallennaArkistoon();
-                                return true;
-                            case R.id.testaa_haly:
-                                showDialog(
-                                        "Hälytyksen testaus! Hälytys tulee 5 sekunnin kuluttua.",
-                                        "Voit laittaa puhelimen näppäinlukkoon tai poistua sovelluksesta. Älä sammuta sovellusta kokonaan taustalta, silloin sammuu myös ajastin joka lähettää hälytyksen.",
-                                        "Peruuta",
-                                        "Testaa",
-                                        "testAlarm");
-                                return true;
-                            case R.id.check_settings:
-                                loadTestSettingsFragment();
-                                return true;
-                            case R.id.hiljenna_halyt:
-                                if (preferences.getInt("aaneton_profiili", -1) == 1) {
-                                    showDialog(
-                                            "Hälytysten hiljennys!",
-                                            "Haluatko varmasti hiljentää hälytykset?",
-                                            "Peruuta",
-                                            "Kyllä",
-                                            "setSoundSilent");
-                                } else {
-                                    setSoundSilent();
-                                }
-                                return true;
-                            case R.id.timer:
-                                startTimerActivity();
-                                return true;
-                            case R.id.changelog:
-                                startChangelog();
-                                return true;
-                            case R.id.tallennatietokanta:
-                                showDialog(
-                                        "Haluatko tallentaa arkistossa olevat hälytykset?",
-                                        "Tiedosto on avattavissa MS Excel tai jollain muulla ohjelmalla joka tukee .db tiedostoja.",
-                                        "Peruuta",
-                                        "Kyllä",
-                                        "saveDatabase");
-                                //saveFile();
-                                /*if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                    askPermissionWriteExternalStorages();
-                                } else {
-                                    showDialog(
-                                            "Tietokannassa olevat hälytykset tallennetaan puhelimen muistiin nimellä: Hälytykset VPK Apuri.",
-                                            "Tiedosto on avattavissa MS Excel tai jollain muulla ohjelmalla joka tukee .db tiedostoja.",
-                                            new DialogInterface.OnClickListener() {
-                                                @Override
-                                                public void onClick(DialogInterface dialog, int which) {
-                                                    backupDatabase();
-                                                }
-                                            });
-                                }*/
-                                return true;
-                            case R.id.tyhjennatietokanta:
-                                showDialog(
-                                        "Arkiston tyhjentäminen!",
-                                        "Arkistossa olevat hälytykset poistetaan.\nPoistamisen jälkeen arkistoa ei voida palauttaa.\nOletko varma että haluat poistaa hälytykset?",
-                                        "Peruuta",
-                                        "Kyllä",
-                                        "deleteDatabase"
-                                );
-                                return true;
-                            case R.id.palautetta:
-                                startLahetaPalaute();
-                                return true;
-                        }
-
-                        return true;
+            mDrawerLayout.closeDrawers();
+            switch (menuItem.getItemId()) {
+                case R.id.tallenna_arkistoon_haly:
+                    loadTallennaArkistoonFragment();
+                    //startTallennaArkistoon();
+                    return true;
+                case R.id.testaa_haly:
+                    showDialog("Hälytyksen testaus! Hälytys tulee 5 sekunnin kuluttua.", "Voit laittaa puhelimen näppäinlukkoon tai poistua sovelluksesta. Älä sammuta sovellusta kokonaan taustalta, silloin sammuu myös ajastin joka lähettää hälytyksen.", "Testaa", "testAlarm");
+                    return true;
+                case R.id.hiljenna_halyt:
+                    if (preferences.getInt("aaneton_profiili", -1) == 1) {
+                        showDialog("Hälytysten hiljennys!", "Haluatko varmasti hiljentää hälytykset?", "Kyllä", "setSoundSilent");
+                    } else {
+                        setSoundSilent();
                     }
-                });
+                    return true;
+                case R.id.timer:
+                    startTimerActivity();
+                    return true;
+                case R.id.changelog:
+                    startChangelog();
+                    return true;
+                case R.id.tallennatietokanta:
+                    showDialog("Haluatko tallentaa arkistossa olevat hälytykset?", "Tiedosto on avattavissa MS Excel tai jollain muulla ohjelmalla joka tukee .json tiedostoja.", "Kyllä", "saveDatabase");
+                    return true;
+                case R.id.palautatietokanta:
+                    showDialog("Palauta tietokanta.", "Voit palauttaa arkiston .json tiedostosta mikä on tallennettu tästä sovelluksesta.", "Palauta", "returnDatabase");
+                    return true;
+                case R.id.tyhjennatietokanta:
+                    showDialog("Arkiston tyhjentäminen!", "Arkistossa olevat hälytykset poistetaan.\nPoistamisen jälkeen arkistoa ei voida palauttaa.\nOletko varma että haluat poistaa hälytykset?", "Kyllä", "deleteDatabase");
+                    return true;
+                case R.id.palautetta:
+                    startLahetaPalaute();
+                    return true;
+                case R.id.check_update:
+                    //readVersionData();
+                    checkNewestVersion();
+                    return true;
+            }
+
+            return true;
+        });
 
         emailAddress = new String[1];
         emailAddress[0] = "kultalaaki@gmail.com";
@@ -208,6 +196,57 @@ public class FrontpageActivity extends AppCompatActivity implements ActivityComp
         new WhatsNewScreen(this).show();
     }
 
+    /**
+     * Show info to user if there is newer version available.
+     */
+    private void checkNewestVersion() {
+        Thread thread = new Thread(() -> {
+            try {
+                PackageInfo packageInfo = this.getPackageManager().getPackageInfo(this.getPackageName(), PackageManager.GET_ACTIVITIES);
+                VersionDataProcessor versionDataProcessor = new VersionDataProcessor(packageInfo.versionCode);
+                versionDataProcessor.readObjectsToArray();
+                versionDataProcessor.setHighestVersions();
+                if (preferences.getBoolean("beta_program", false)) {
+                    if (versionDataProcessor.isNewBetaVersionAvailable()) {
+                        newestVersion = versionDataProcessor.getHighestBeta();
+                        mHandler.post(() -> showDialog(
+                                "Sinun versio: " + packageInfo.versionName,
+                                "Uusi versio: " + newestVersion.getName() + ".",
+                                "Lataa: " + newestVersion.getName(),
+                                "newVersion"));
+                    } else {
+                        runOnUiThread(() -> Toast.makeText(
+                                FrontpageActivity.this,
+                                "Uusin BETA versio asennettu.", Toast.LENGTH_SHORT).show());
+                    }
+                } else {
+                    if (versionDataProcessor.isNewStableVersionAvailable()) {
+                        newestVersion = versionDataProcessor.getHighestStable();
+                        mHandler.post(() -> showDialog(
+                                "Sinun versio: " + packageInfo.versionName,
+                                "Uusi versio: " + newestVersion.getName() + ".",
+                                "Lataa: " + newestVersion.getName(),
+                                "newVersion"));
+                    } else {
+                        runOnUiThread(() -> Toast.makeText(
+                                FrontpageActivity.this,
+                                "Uusin versio asennettu", Toast.LENGTH_LONG).show());
+                    }
+                }
+
+            } catch (Exception e) {
+                // Inform user if reading version data fails
+                // Log error to firebase crashlytics
+                MyNotifications notification = new MyNotifications(this);
+                notification.showInformationNotification("Versionumeron tarkistaminen epäonnistui. Yritä myöhemmin uudelleen.");
+                FirebaseCrashlytics.getInstance().log("Versionumeron tarkistus: " + e);
+            }
+        });
+
+        thread.start();
+    }
+
+    @SuppressLint("SourceLockedOrientationActivity")
     @Override
     protected void onResume() {
         super.onResume();
@@ -225,23 +264,13 @@ public class FrontpageActivity extends AppCompatActivity implements ActivityComp
         }
     }
 
-    public void loadTestSettingsFragment() {
-        TestSettingsFragment testSettingsFragment = new TestSettingsFragment();
-        FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-        fragmentTransaction.addToBackStack(null);
-        fragmentTransaction.replace(R.id.etusivuContainer, testSettingsFragment, "testSettingsFragment").commit();
-    }
-
     public void loadLegalFragment() {
-        //FragmentManager fragmentManager = this.getSupportFragmentManager();
         AffirmationFragment affirmationFragment = new AffirmationFragment();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-        //fragmentTransaction.setCustomAnimations(R.animator.slide_in_left, R.animator.slide_out_right);
         fragmentTransaction.add(R.id.etusivuContainer, affirmationFragment, "etusivuLegal").commit();
     }
 
     public void loadArkistoFragment() {
-        //FragmentManager fragmentManager = this.getSupportFragmentManager();
         ArchiveFragment archiveFragment = new ArchiveFragment();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
         fragmentTransaction.addToBackStack(null);
@@ -249,18 +278,13 @@ public class FrontpageActivity extends AppCompatActivity implements ActivityComp
     }
 
     public void loadSettingsFragment() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            ActivityOptions options = ActivityOptions.makeSceneTransitionAnimation(FrontpageActivity.this);
-            Intent intent = new Intent(FrontpageActivity.this, SettingsActivity.class);
-            startActivity(intent, options.toBundle());
-        } else {
-            Intent intent = new Intent(FrontpageActivity.this, SettingsActivity.class);
-            startActivity(intent);
-        }
+        ActivityOptions options = ActivityOptions.makeSceneTransitionAnimation(FrontpageActivity.this);
+        Intent intent = new Intent(FrontpageActivity.this, SettingsActivity.class);
+        startActivity(intent, options.toBundle());
+
     }
 
     public void loadOhjeetFragment() {
-        //FragmentManager fragmentManager = this.getSupportFragmentManager();
         GuidelineFragment guidelineFragment = new GuidelineFragment();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
         fragmentTransaction.addToBackStack(null);
@@ -272,35 +296,27 @@ public class FrontpageActivity extends AppCompatActivity implements ActivityComp
     }
 
     public void loadEtusivuFragment() {
-        //FragmentManager fragmentManager = this.getSupportFragmentManager();
         FrontpageFragment frontpageFragment = new FrontpageFragment();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-        //fragmentTransaction.setCustomAnimations(R.animator.slide_in_left, R.animator.slide_out_right);
         fragmentTransaction.add(R.id.etusivuContainer, frontpageFragment, "etusivuNavigation").commit();
     }
 
     public void loadEtusivuClearingBackstack() {
-        //FragmentManager fragmentManager = this.getSupportFragmentManager();
         fragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
         FrontpageFragment frontpageFragment = new FrontpageFragment();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-        //fragmentTransaction.setCustomAnimations(R.animator.slide_in_left, R.animator.slide_out_right);
         fragmentTransaction.replace(R.id.etusivuContainer, frontpageFragment, "etusivuNavigation").commit();
     }
 
     public void loadEtusivuFromFragment() {
         mFirebaseAnalytics.setAnalyticsCollectionEnabled(analytics);
-        //FragmentManager fragmentManager = this.getSupportFragmentManager();
         FrontpageFragment frontpageFragment = new FrontpageFragment();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-        //fragmentTransaction.setCustomAnimations(R.animator.slide_in_left, R.animator.slide_out_right);
         fragmentTransaction.replace(R.id.etusivuContainer, frontpageFragment, "etusivuNavigation");
-        //fragmentTransaction.addToBackStack(null);
         fragmentTransaction.commit();
     }
 
     public void loadTallennaArkistoonFragment() {
-        //FragmentManager fragmentManager = this.getSupportFragmentManager();
         SaveToArchiveFragment saveToArchiveFragment = new SaveToArchiveFragment();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
         fragmentTransaction.addToBackStack(null);
@@ -319,7 +335,6 @@ public class FrontpageActivity extends AppCompatActivity implements ActivityComp
     }
 
     public void loadHalytysTietokannastaFragment(FireAlarm fireAlarm) {
-        //FragmentManager fragmentManager = this.getSupportFragmentManager();
         ArchivedAlarmFragment archivedAlarmFragment = ArchivedAlarmFragment.newInstance(fireAlarm);
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
         fragmentTransaction.addToBackStack(null);
@@ -331,38 +346,30 @@ public class FrontpageActivity extends AppCompatActivity implements ActivityComp
     }
 
     public void openSetTimerNewInstance(String primaryKey) {
-        //FragmentManager fragmentManager = this.getSupportFragmentManager();
         SetTimerFragment setTimerFragment = SetTimerFragment.newInstance(primaryKey);
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-        //fragmentTransaction.setCustomAnimations(R.animator.slide_in_left, R.animator.slide_out_right);
         fragmentTransaction.addToBackStack(null);
         fragmentTransaction.replace(R.id.etusivuContainer, setTimerFragment, "setTimerFragment").commit();
     }
 
     public void openSetTimer() {
-        //FragmentManager fragmentManager = this.getSupportFragmentManager();
         SetTimerFragment setTimerFragment = new SetTimerFragment();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-        //fragmentTransaction.setCustomAnimations(R.animator.slide_in_left, R.animator.slide_out_right);
         fragmentTransaction.addToBackStack(null);
         fragmentTransaction.replace(R.id.etusivuContainer, setTimerFragment, "setTimerFragment").commit();
     }
 
     public void startTimerActivity() {
-        //FragmentManager fragmentManager = this.getSupportFragmentManager();
         TimerFragment timerFragment = new TimerFragment();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
         fragmentTransaction.addToBackStack(null);
         fragmentTransaction.replace(R.id.etusivuContainer, timerFragment, "timerFragment").commit();
     }
 
-    public long saveTimerToDB(String name, String startTime, String stopTime, String ma, String ti, String ke, String to,
-                              String pe, String la, String su, String selector, String isiton) {
+    public long saveTimerToDB(String name, String startTime, String stopTime, String ma, String ti, String ke, String to, String pe, String la, String su, String selector, String isiton) {
         dbTimer = new DBTimer(this);
-        //Toast.makeText(getApplicationContext(), "melkein " + name + startTime + stopTime + ma + ti+ke+to+pe+la+su+selector, Toast.LENGTH_LONG).show();
-        long tallennettu = dbTimer.insertData(name, startTime, stopTime,
-                ma, ti, ke, to, pe, la, su, selector, isiton);
-        if(tallennettu != -1) {
+        long tallennettu = dbTimer.insertData(name, startTime, stopTime, ma, ti, ke, to, pe, la, su, selector, isiton);
+        if (tallennettu != -1) {
             showToast("Ajastin", "Tallennettu.");
             //Toast.makeText(getApplicationContext(), "Tallennettu", Toast.LENGTH_LONG).show();
             return tallennettu;
@@ -372,64 +379,63 @@ public class FrontpageActivity extends AppCompatActivity implements ActivityComp
 
     @Override
     public void onTimeSet(TimePicker view, int hourOfDay, int minute) {
-        Log.i("TAG", "OnTimeSet reached");
-        SetTimerFragment setTimerFragment = (SetTimerFragment)
-                getSupportFragmentManager().findFragmentByTag("setTimerFragment");
-        if(setTimerFragment != null) {
+        SetTimerFragment setTimerFragment = (SetTimerFragment) getSupportFragmentManager().findFragmentByTag("setTimerFragment");
+        if (setTimerFragment != null) {
             setTimerFragment.setTimerTimes(hourOfDay, minute);
         }
     }
 
+    /**
+     * Create notification channels
+     */
     public void createChannels() {
 
-        //Ilmoituskanava hälytyksille
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Create the NotificationChannel
-            int importance = NotificationManager.IMPORTANCE_HIGH;
-            NotificationChannel halyChannel = new NotificationChannel("HALYTYS", "HÄLYTYS", importance);
-            halyChannel.setDescription("Tämän kanavan ilmoitukset ovat hälytyksiä varten.");
-            halyChannel.enableVibration(false);
-            halyChannel.setSound(null, null);
-            NotificationManager notificationManager = (NotificationManager) getSystemService(
-                    NOTIFICATION_SERVICE);
-            if (notificationManager != null) {
-                notificationManager.createNotificationChannel(halyChannel);
-            }
+        // NotificationChannel alarms
+        int importanceHigh = NotificationManager.IMPORTANCE_HIGH;
+        NotificationChannel alarmChannel = new NotificationChannel(Constants.NOTIFICATION_CHANNEL_ALARM, Constants.NOTIFICATION_CHANNEL_ALARM, importanceHigh);
+        alarmChannel.setDescription("Tämän kanavan ilmoitukset ovat hälytyksiä varten.");
+        alarmChannel.enableVibration(false);
+        alarmChannel.setSound(null, null);
+        NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (notificationManager != null) {
+            notificationManager.createNotificationChannel(alarmChannel);
         }
 
-        //Ilmoituskanava kun hälytykset on hiljennetty
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Create the NotificationChannel
-            int importance = NotificationManager.IMPORTANCE_DEFAULT;
-            NotificationChannel ilmChannel = new NotificationChannel("HILJENNYS", "HILJENNYS", importance);
-            ilmChannel.setDescription("Tämä ilmoituskanava ilmoittaa kun sovelluksesta on hälytykset hiljennetty");
-            // Register the channel with the system; you can't change the importance
-            // or other notification behaviors after this
-            ilmChannel.setSound(null, null);
-            ilmChannel.enableVibration(false);
-            NotificationManager notificationManager = (NotificationManager) getSystemService(
-                    NOTIFICATION_SERVICE);
-            if (notificationManager != null) {
-                notificationManager.createNotificationChannel(ilmChannel);
-            }
+        // NotificationChannel alarms silenced
+        int importanceDefault = NotificationManager.IMPORTANCE_DEFAULT;
+        NotificationChannel silentChannel = new NotificationChannel(Constants.NOTIFICATION_CHANNEL_SILENCE, Constants.NOTIFICATION_CHANNEL_SILENCE, importanceDefault);
+        silentChannel.setDescription("Tämä ilmoituskanava ilmoittaa kun sovelluksesta on hälytykset hiljennetty");
+        // Register the channel with the system; you can't change the importance
+        // or other notification behaviors after this
+        silentChannel.setSound(null, null);
+        silentChannel.enableVibration(false);
+        if (notificationManager != null) {
+            notificationManager.createNotificationChannel(silentChannel);
         }
 
-        //Ilmoituskanava aktiiviselle servicelle
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Create the NotificationChannel
-            int importance = NotificationManager.IMPORTANCE_DEFAULT;
-            NotificationChannel mChannel = new NotificationChannel("ACTIVE SERVICE", "ACTIVE SERVICE", importance);
-            mChannel.setDescription("Tämä ilmoituskanava on käytössä kun sovelluksen taustapalvelu on käynnissä osoitteen hakua ja hälytysäänen soittamista varten.");
-            mChannel.enableVibration(false);
-            mChannel.setSound(null, null);
-            // Register the channel with the system; you can't change the importance
-            // or other notification behaviors after this
-            NotificationManager notificationManager = (NotificationManager) getSystemService(
-                    NOTIFICATION_SERVICE);
-            if (notificationManager != null) {
-                notificationManager.createNotificationChannel(mChannel);
-            }
+        // NotificationChannel active service
+        int importance = NotificationManager.IMPORTANCE_DEFAULT;
+        NotificationChannel serviceChannel = new NotificationChannel(Constants.NOTIFICATION_CHANNEL_SERVICE, Constants.NOTIFICATION_CHANNEL_SERVICE, importance);
+        serviceChannel.setDescription("Tämä ilmoituskanava on käytössä kun sovelluksen taustapalvelu on käynnissä osoitteen hakua ja hälytysäänen soittamista varten.");
+        serviceChannel.enableVibration(false);
+        serviceChannel.setSound(null, null);
+        // Register the channel with the system; you can't change the importance
+        // or other notification behaviors after this
+        if (notificationManager != null) {
+            notificationManager.createNotificationChannel(serviceChannel);
         }
+
+        // NotificationChannel error
+        NotificationChannel mChannel = new NotificationChannel(Constants.NOTIFICATION_CHANNEL_INFORMATION, Constants.NOTIFICATION_CHANNEL_INFORMATION, NotificationManager.IMPORTANCE_DEFAULT);
+        mChannel.setDescription("Tämä ilmoituskanava on käytössä kun sovelluus ilmoittaa jostain virheestä.");
+        mChannel.enableVibration(false);
+        mChannel.setSound(null, null);
+        // Register the channel with the system; you can't change the importance
+        // or other notification behaviors after this
+        if (notificationManager != null) {
+            notificationManager.createNotificationChannel(mChannel);
+        }
+
     }
 
     @Override
@@ -441,50 +447,38 @@ public class FrontpageActivity extends AppCompatActivity implements ActivityComp
         return super.onOptionsItemSelected(item);
     }
 
+    /**
+     * Send test alarm
+     */
     public void testAlarm() {
 
-        ericaEtusivu = preferences.getBoolean("Erica", true);
-        if (ericaEtusivu) {
-            Handler handler1 = new Handler();
-            handler1.postDelayed(new Runnable() {
-                public void run() {
-                    long aika = System.currentTimeMillis();
-                    String Aika = (String) DateFormat.format("EEE, dd.MMM yyyy, H:mm:ss", new Date(aika));
-                    String timeToMessage = (String) DateFormat.format("H:mm:ss_dd.MM.yyyy", new Date(aika));
-                    Intent halyaaniService = new Intent(getApplicationContext(), IsItAlarmService.class);
-                    String alarmMessage = getString(R.string.testihalytysEricaEtuosa) + " " + timeToMessage + getString(R.string.testihalytysEricaTakaosa);
-                    halyaaniService.putExtra("message", alarmMessage);
-                    halyaaniService.putExtra("number", "+358401234567");
-                    halyaaniService.putExtra("halytysaani", "false");
-                    halyaaniService.putExtra("timestamp", Aika);
-                    getApplicationContext().startService(halyaaniService);
-                }
-            }, 5000);
-        } else {
-            Handler handler = new Handler();
-            handler.postDelayed(new Runnable() {
-                public void run() {
-                    long aika = System.currentTimeMillis();
-                    String Aika = (String) DateFormat.format("EEE, dd.MMM yyyy, H:mm:ss", new Date(aika));
-                    Intent halyaaniService = new Intent(getApplicationContext(), IsItAlarmService.class);
-                    String alarmMessage = "TESTIHÄLYTYS; Operaatio nro 220/Etsintä/Kankaanpää/12.10.18:30. Kuittaus: 220 ok/ei/pm hh:mm";
-                    halyaaniService.putExtra("message", alarmMessage);
-                    halyaaniService.putExtra("number", "+358401234567");
-                    halyaaniService.putExtra("halytysaani", "false");
-                    halyaaniService.putExtra("timestamp", Aika);
-                    getApplicationContext().startService(halyaaniService);
-                }
-            }, 5000);
-        }
+        preferences.edit().putString("halyvastaanotto11", "0401234567").apply();
+        Handler handler1 = new Handler();
+        handler1.postDelayed(() -> {
+            long aika = System.currentTimeMillis();
+            String Aika = (String) DateFormat.format("EEE, dd.MMM yyyy, H:mm:ss", new Date(aika));
+            String timeToMessage = (String) DateFormat.format("H:mm:ss_dd.MM.yyyy", new Date(aika));
+            Intent halyaaniService = new Intent(getApplicationContext(), SMSBackgroundService.class);
+            String alarmMessage = getString(R.string.testihalytysEricaEtuosa) + " " + timeToMessage + getString(R.string.testihalytysEricaTakaosa);
+            halyaaniService.putExtra("message", alarmMessage);
+            halyaaniService.putExtra("number", "0401234567");
+            halyaaniService.putExtra("halytysaani", "false");
+            halyaaniService.putExtra("timestamp", Aika);
+            getApplicationContext().startService(halyaaniService);
+        }, 5000);
+
     }
 
-    public void startLahetaPalaute () {
-        Intent intentemail = new Intent(Intent.ACTION_SENDTO);
-        intentemail.setData(Uri.parse("mailto:"));
-        intentemail.putExtra(Intent.EXTRA_EMAIL, emailAddress);
-        intentemail.putExtra(Intent.EXTRA_SUBJECT, emailSubject);
-        if (intentemail.resolveActivity(getPackageManager()) != null) {
-            startActivity(intentemail);
+    /**
+     * Send feedback through mail app
+     */
+    public void startLahetaPalaute() {
+        Intent intentEmail = new Intent(Intent.ACTION_SENDTO);
+        intentEmail.setData(Uri.parse("mailto:"));
+        intentEmail.putExtra(Intent.EXTRA_EMAIL, emailAddress);
+        intentEmail.putExtra(Intent.EXTRA_SUBJECT, emailSubject);
+        if (intentEmail.resolveActivity(getPackageManager()) != null) {
+            startActivity(intentEmail);
         }
     }
 
@@ -498,184 +492,119 @@ public class FrontpageActivity extends AppCompatActivity implements ActivityComp
         }
     }
 
-    public void askPermissionReadExternalStorage() {
-        if (ContextCompat.checkSelfPermission(FrontpageActivity.this,
-                Manifest.permission.READ_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED) {
-
-            // Second time asking. Should we show an explanation?
-            if (ActivityCompat.shouldShowRequestPermissionRationale(FrontpageActivity.this,
-                    Manifest.permission.READ_EXTERNAL_STORAGE)) {
-
-                // Show an explanation to the user *asynchronously* -- don't block
-                // this thread waiting for the user's response! After the user
-                // sees the explanation, try again to request the permission.
-                showDialog(
-                        "VPK Apuri pyytää lupaa käyttää laitteellasi olevia kuvia ja mediaa.",
-                        "Tämä lupa tarvitaan hälytysäänen asettamiseksi. Ilman tätä lupaa sovellus ei voi asettaa hälytysääntä. Pääsy asetuksiin on estetty kunnes lupa on myönnetty.",
-                        "Peruuta",
-                        "Anna lupa",
-                        "askPermission");
-            } else {
-                // First time asking. No explanation needed, we can request the permission.
-                ActivityCompat.requestPermissions(FrontpageActivity.this,
-                        new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
-                        MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE_SETTINGS);
-            }
-        } else {
-            // We have permission
-            loadSettingsFragment();
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           @NonNull String[] permissions, @NonNull int[] grantResults) {
-        if (requestCode == MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE_SETTINGS) {
-            if (grantResults.length > 0
-                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // Lupa annettu mene asetuksiin
-                loadSettingsFragment();
-            } else {
-                // ei lupaa. 1. kielto tulee tänne
-                showDialog(
-                        "Et antanut lupaa käyttää laitteellasi olevia kuvia ja mediaa.",
-                        "Pääsy sovelluksen asetuksiin on estetty kunnes annat luvan käyttää laitteellasi olevia kuvia ja mediaa.",
-                        "OK");
-            }
-        }
-    }
-
-    public void showDialog(String upperText, String lowerText, String positiveButtonText) {
+    /**
+     * Dialog factory
+     *
+     * @param upperText          Upper of dialog
+     * @param lowerText          Lower text of dialog
+     * @param positiveButtonText Positive button text
+     * @param chooser            Negative button text
+     */
+    @SuppressLint("SetTextI18n")
+    private void showDialog(String upperText, String lowerText, String positiveButtonText, String chooser) {
         final AlertDialog dialog = new AlertDialog.Builder(this).create();
-        final View dialogLayout = getLayoutInflater().inflate(R.layout.dialog_permissions, null);
+        final View dialogLayout = getLayoutInflater().inflate(R.layout.dialog, null);
         dialog.setView(dialogLayout);
 
-        TextView whatPermission = dialogLayout.findViewById(R.id.textViewWhatPermission);
-        TextView whatReason = dialogLayout.findViewById(R.id.textViewReasoning);
-        whatPermission.setText(upperText);
-        whatReason.setText(lowerText);
-
-        Button buttonPositive = dialogLayout.findViewById(R.id.buttonPositive);
-        buttonPositive.setText(positiveButtonText);
-
-        buttonPositive.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                dialog.dismiss();
-            }
-        });
-
-        dialog.show();
-    }
-
-    private void showDialog(String upperText, String lowerText, String negativeButtonText, String positiveButtonText, String chooser) {
-        final AlertDialog dialog = new AlertDialog.Builder(this).create();
-        final View dialogLayout = getLayoutInflater().inflate(R.layout.dialog_permissions, null);
-        dialog.setView(dialogLayout);
-
-        TextView dialogUpperText = dialogLayout.findViewById(R.id.textViewWhatPermission);
-        TextView dialogLowerText = dialogLayout.findViewById(R.id.textViewReasoning);
+        TextView dialogUpperText = dialogLayout.findViewById(R.id.dialogUpperText);
+        TextView dialogLowerText = dialogLayout.findViewById(R.id.dialogLowerText);
         dialogUpperText.setText(upperText);
         dialogLowerText.setText(lowerText);
 
         Button buttonPositive = dialogLayout.findViewById(R.id.buttonPositive);
         Button buttonNegative = dialogLayout.findViewById(R.id.buttonNegative);
         buttonPositive.setText(positiveButtonText);
-        buttonNegative.setText(negativeButtonText);
+        buttonNegative.setText("Peruuta");
 
         switch (chooser) {
             case "testAlarm":
-                buttonPositive.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        testAlarm();
-                        dialog.dismiss();
-                    }
+                buttonPositive.setOnClickListener(v -> {
+                    testAlarm();
+                    dialog.dismiss();
                 });
-                buttonNegative.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        dialog.dismiss();
-                    }
-                });
+                buttonNegative.setOnClickListener(v -> dialog.dismiss());
                 break;
             case "setSoundSilent":
-                buttonPositive.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        setSoundSilent();
-                        dialog.dismiss();
-                    }
+                buttonPositive.setOnClickListener(v -> {
+                    setSoundSilent();
+                    dialog.dismiss();
                 });
-                buttonNegative.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        dialog.dismiss();
-                    }
-                });
+                buttonNegative.setOnClickListener(v -> dialog.dismiss());
                 break;
             case "askPermission":
-                buttonPositive.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        ActivityCompat.requestPermissions(FrontpageActivity.this,
-                                new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
-                                MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE_SETTINGS);
-                        dialog.dismiss();
-                    }
+                buttonPositive.setOnClickListener(v -> {
+                    ActivityCompat.requestPermissions(FrontpageActivity.this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE_SETTINGS);
+                    dialog.dismiss();
                 });
-                buttonNegative.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        dialog.dismiss();
-                    }
-                });
+                buttonNegative.setOnClickListener(v -> dialog.dismiss());
                 break;
             case "saveDatabase":
-                buttonPositive.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        saveFile();
-                        dialog.dismiss();
-                    }
+                buttonPositive.setOnClickListener(v -> {
+                    saveDatabaseBackup();
+                    dialog.dismiss();
                 });
-                buttonNegative.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        dialog.dismiss();
-                    }
+                buttonNegative.setOnClickListener(v -> dialog.dismiss());
+                break;
+            case "returnDatabase":
+                buttonPositive.setOnClickListener(v -> {
+                    openFile();
+                    dialog.dismiss();
                 });
+                buttonNegative.setOnClickListener(v -> dialog.dismiss());
+                break;
+            case "newVersion":
+                buttonPositive.setOnClickListener(v -> {
+                    startNewVersionDownload();
+                    dialog.dismiss();
+                });
+                buttonNegative.setOnClickListener(v -> dialog.dismiss());
+                break;
+            case "newest":
+                buttonPositive.setOnClickListener(v -> dialog.dismiss());
                 break;
             case "deleteDatabase":
-                buttonPositive.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        deleteDatabase();
-                        dialog.dismiss();
-                    }
+                buttonPositive.setOnClickListener(v -> {
+                    deleteDatabase();
+                    dialog.dismiss();
                 });
-                buttonNegative.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        dialog.dismiss();
-                    }
-                });
+                buttonNegative.setOnClickListener(v -> dialog.dismiss());
         }
 
 
         dialog.show();
-        dialog.getWindow().setBackgroundDrawable(null);
+        Objects.requireNonNull(dialog.getWindow()).setBackgroundDrawable(null);
     }
 
+    /**
+     * Launch browser intent
+     * User can download new version from github releases page
+     */
+    private void startNewVersionDownload() {
+        Intent startBrowser = new Intent(Intent.ACTION_VIEW);
+        // If user is beta tester, send to github page where all versions are
+        // else send user to vpkapuri.fi
+        if(preferences.getBoolean("beta_program", false)) {
+            startBrowser.setData(Uri.parse(Constants.ADDRESS_GITHUB_RELEASES_DOWNLOAD));
+        } else {
+            startBrowser.setData(Uri.parse(Constants.ADDRESS_STABLE_RELEASE_DOWNLOAD));
+        }
+
+        startActivity(startBrowser);
+    }
+
+    /**
+     * Show toast message
+     *
+     * @param headText  Head of toast
+     * @param toastText text content
+     */
     public void showToast(String headText, String toastText) {
         LayoutInflater inflater = getLayoutInflater();
-        View layout = inflater.inflate(R.layout.custom_toast,
-                (ViewGroup) findViewById(R.id.custom_toast_container));
+        View layout = inflater.inflate(R.layout.custom_toast, findViewById(R.id.custom_toast_container));
 
-        TextView head = (TextView) layout.findViewById(R.id.head_text);
+        TextView head = layout.findViewById(R.id.head_text);
         head.setText(headText);
-        TextView toastMessage = (TextView) layout.findViewById(R.id.toast_text);
+        TextView toastMessage = layout.findViewById(R.id.toast_text);
         toastMessage.setText(toastText);
 
         Toast toast = new Toast(getApplicationContext());
@@ -686,15 +615,169 @@ public class FrontpageActivity extends AppCompatActivity implements ActivityComp
         toast.show();
     }
 
-    private void saveFile() {
-        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("VPKApuri/db");
-        intent.putExtra(Intent.EXTRA_TITLE, "HälytyksetVPKApuri.db");
-
-        startActivityForResult(intent, CREATE_FILE);
+    /**
+     * Save database backup as json file
+     */
+    private void saveDatabaseBackup() {
+        if (isExternalStorageWritable()) {
+            try {
+                File file = getAlbumStorageDir("VPK Apuri", "Halytykset_tietokanta.json");
+                FileOutputStream fos = new FileOutputStream(file);
+                FireAlarmJSONWriter fireAlarmJsonWriter = new FireAlarmJSONWriter();
+                FireAlarmRepository fireAlarmRepository = new FireAlarmRepository(getApplication());
+                fireAlarmJsonWriter.writeJsonStream(fos, fireAlarmRepository.getAllFireAlarmsToList());
+                fos.close();
+                Toast.makeText(this, "Tiedosto on tallennettu puhelimen muistiin. Dokumentit -> VPK Apuri", Toast.LENGTH_LONG).show();
+            } catch (IOException e) {
+                FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
+                crashlytics.log("IOException: " + e);
+                MyNotifications notifications = new MyNotifications(this);
+                notifications.showInformationNotification("Virhe tietokannan tallennuksessa.");
+            }
+        }
     }
 
+    /**
+     * Checks if external storage is available for read and write
+     */
+    public boolean isExternalStorageWritable() {
+        String state = Environment.getExternalStorageState();
+        return Environment.MEDIA_MOUNTED.equals(state);
+    }
+
+    /**
+     * Get album storage directory with given album name
+     * if album name doesn't exist, create it.
+     *
+     * @param albumName directory name
+     * @param fileName  file name
+     * @return new File with given name
+     */
+    public File getAlbumStorageDir(String albumName, String fileName) {
+        // Get the directory for the user's public directory.
+        File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), albumName);
+        if (!file.exists()) {
+            // Location not found, creating new directory
+            file.mkdirs();
+        }
+
+        return new File(file, fileName);
+    }
+
+    // Request code for selecting a json file.
+    private static final int PICK_JSON_FILE = 2;
+
+    /**
+     * Starts activity for user to select file from device
+     */
+    private void openFile() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+
+        startActivityForResult(intent, PICK_JSON_FILE);
+    }
+
+    /**
+     * Acrtivity result after picking file
+     * Pass json string forward after selection and successful read operation
+     *
+     * @param requestCode request code
+     * @param resultCode  result code
+     * @param resultData  result data
+     */
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent resultData) {
+        super.onActivityResult(requestCode, resultCode, resultData);
+
+        if (requestCode == PICK_JSON_FILE && resultCode == Activity.RESULT_OK) {
+            // The result data contains a URI for the document or directory that
+            // the user selected.
+            Uri uri;
+            String actualfilepath = "";
+
+            if (resultData != null) {
+                uri = resultData.getData();
+                String tempID, id;
+
+                assert uri != null;
+                if (Objects.equals(uri.getAuthority(), "com.android.externalstorage.documents")) {
+                    tempID = DocumentsContract.getDocumentId(uri);
+                    String[] split = tempID.split(":");
+                    String type = split[0];
+                    id = split[1];
+                    if (type.equals("primary")) {
+                        actualfilepath = Environment.getExternalStorageDirectory() + "/" + id;
+                    }
+                }
+
+                // Perform operations on the document using its URI.
+                // Read content
+                try {
+                    //File file = new File(actualfilepath);
+                    BufferedReader bufferedReader = new BufferedReader(new FileReader(actualfilepath));
+                    String line;
+                    StringBuilder result = new StringBuilder();
+
+                    while ((line = bufferedReader.readLine()) != null) {
+                        result.append(line);
+                    }
+                    bufferedReader.close();
+
+                    // String result contains all lines from backup json
+                    // Read json to java
+                    readJsonToJava(result.toString());
+                } catch (NullPointerException | IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    /**
+     * Reads alarms from json and handles inserting alarms back to database
+     *
+     * @param json string read from file
+     */
+    private void readJsonToJava(String json) {
+        try {
+            JSONArrayReader read = new JSONArrayReader(json);
+            ArrayList<JSONObject> objects = read.getObjects();
+
+            insertBackupToDatabase(objects);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Inserts alarms back to database
+     * handles json exception
+     *
+     * @param alarms list contains json objects of alarms
+     */
+    private void insertBackupToDatabase(ArrayList<JSONObject> alarms) {
+        FireAlarmRepository repository = new FireAlarmRepository(getApplication());
+
+        try {
+            for (JSONObject object : alarms) {
+                FireAlarm fireAlarm = new FireAlarm(object.getString("tehtäväluokka"), object.getString("kiireellisyystunnus"),
+                        object.getString("viesti"), object.getString("osoite"), object.getString("kommentti"),
+                        object.getString("vastaus"), object.getString("timestamp"), object.getString("optional2"),
+                        object.getString("optional3"), object.getString("optional4"), object.getString("optional5"));
+
+                repository.insert(fireAlarm);
+            }
+            Toast.makeText(this, "Tietokanta palautettu.", Toast.LENGTH_LONG).show();
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    /**
+     * Deletes all firealarms from database
+     */
     public void deleteDatabase() {
         FireAlarmRepository fireAlarmRepository = new FireAlarmRepository(getApplication());
         fireAlarmRepository.deleteAllFireAlarms();
@@ -702,12 +785,14 @@ public class FrontpageActivity extends AppCompatActivity implements ActivityComp
         showToast("Arkisto", "Arkisto tyhjennetty!");
     }
 
+    /**
+     * Shows "whats new" screen if new install or app updated
+     */
     private class WhatsNewScreen {
-        private static final String LOG_TAG                 = "WhatsNewScreen";
 
-        private static final String LAST_VERSION_CODE_KEY   = "last_version_code";
+        private static final String LAST_VERSION_CODE_KEY = "last_version_code";
 
-        private Activity            mActivity;
+        private final Activity mActivity;
 
         // Constructor memorize the calling Activity ("context")
         private WhatsNewScreen(Activity context) {
@@ -725,48 +810,36 @@ public class FrontpageActivity extends AppCompatActivity implements ActivityComp
                 final long lastVersionCode = prefs.getLong(LAST_VERSION_CODE_KEY, 0);
 
                 // Kokeillaan versionCode == getLongVersionCode()
-                final int versionCode = BuildConfig.VERSION_CODE;
+                final int versionCode = packageInfo.versionCode;
                 if (versionCode != lastVersionCode) {
 
                     if (prefs.getBoolean("firstrun", true)) {
-                        prefs.edit().putInt("aaneton_profiili", 1).commit();
+                        prefs.edit().putInt("aaneton_profiili", Constants.SOUND_PROFILE_NORMAL).commit();
                         prefs.edit().putBoolean("firstrun", false).commit();
                     }
-                    // App updated, add alarm to database
+                    // App updated, add alarmdetection to database
                     FireAlarmRepository fireAlarmRepository = new FireAlarmRepository(getApplication());
-                    FireAlarm fireAlarm = new FireAlarm("999", "C", "Uusi asennus tai sovellus on päivitetty.", "Ei osoitetta", "", "",
-                            "", "", "", "", "");
+                    FireAlarm fireAlarm = new FireAlarm("999", "C", "Uusi asennus tai sovellus on päivitetty.", "Ei osoitetta", "", "", "", "", "", "", "");
                     fireAlarmRepository.insert(fireAlarm);
 
                     // Delete app cache to prevent unnecessary mistakes.
                     deleteCache(getApplicationContext());
-                    Log.i(LOG_TAG, "versionCode " + versionCode + "is different from the last known version " + lastVersionCode);
 
                     final String title = mActivity.getString(R.string.app_name) + " v" + packageInfo.versionName;
 
                     final String message = mActivity.getString(R.string.onlyNewest);
 
                     // Show the News since last version
-                    AlertDialog.Builder builder = new AlertDialog.Builder(mActivity)
-                            .setTitle(title)
-                            .setMessage(message)
-                            .setCancelable(false)
-                            .setPositiveButton(android.R.string.ok, new Dialog.OnClickListener() {
-
-                                public void onClick(DialogInterface dialogInterface, int i) {
-                                    // Mark this version as read
-                                    SharedPreferences.Editor editor = prefs.edit();
-                                    editor.putLong(LAST_VERSION_CODE_KEY, versionCode);
-                                    editor.apply();
-                                    //showTiewtosuojaAfterWhatsnew();
-                                    dialogInterface.dismiss();
-                                }
-                            });
+                    AlertDialog.Builder builder = new AlertDialog.Builder(mActivity).setTitle(title).setMessage(message).setCancelable(false).setPositiveButton(android.R.string.ok, (dialogInterface, i) -> {
+                        // Mark this version as read
+                        SharedPreferences.Editor editor = prefs.edit();
+                        editor.putLong(LAST_VERSION_CODE_KEY, versionCode);
+                        editor.apply();
+                        //showTiewtosuojaAfterWhatsnew();
+                        dialogInterface.dismiss();
+                    });
                     builder.create().show();
-                } else {
-                    Log.i(LOG_TAG, "versionCode " + versionCode + "is already known");
                 }
-
             } catch (PackageManager.NameNotFoundException e) {
                 e.printStackTrace();
             }
@@ -777,12 +850,14 @@ public class FrontpageActivity extends AppCompatActivity implements ActivityComp
                 File dir = context.getCacheDir();
                 deleteDir(dir);
             } catch (Exception e) {
-                Log.i("VPK Apuri","Välimuistin tyhjennys epäonnistui.");
+                FirebaseCrashlytics.getInstance().log("FrontPageActivity.java. Delete cache failed." + e);
             }
         }
+
         boolean deleteDir(File dir) {
             if (dir != null && dir.isDirectory()) {
                 String[] children = dir.list();
+                assert children != null;
                 for (String aChildren : children) {
                     boolean success = deleteDir(new File(dir, aChildren));
                     if (!success) {
@@ -790,7 +865,7 @@ public class FrontpageActivity extends AppCompatActivity implements ActivityComp
                     }
                 }
                 return dir.delete();
-            } else if(dir!= null && dir.isFile()) {
+            } else if (dir != null && dir.isFile()) {
                 return dir.delete();
             } else {
                 return false;

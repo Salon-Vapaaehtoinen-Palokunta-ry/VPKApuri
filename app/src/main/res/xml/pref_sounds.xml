@@ -19,10 +19,10 @@
             android:summary="Ilman Do Not Disturb lupaa sovellus ei voi säädellä äänikanavia hälytyksen tullessa.
             Tämän avulla vaimennetaan soittoääni/viestiääni jotta sovelluksesta asetettu hälytysääni pääsee soimaan. ILMAN TÄTÄ LUPAA SOVELLUS EI PYSTY HÄLYTTÄMÄÄN."
             android:title="Hälytysäänen muuttaminen: Do Not Disturb" />
-        <kultalaaki.vpkapuri.ExtraRingtonePreference
+        <kultalaaki.vpkapuri.misc.ExtraRingtonePreference
             android:defaultValue="content://settings/system/notification_sound"
             android:icon="@drawable/ic_keyboard_arrow_right_white_24dp"
-            android:key="ringtone"
+            android:key="ringtone_rescue"
             android:summary="@string/ringtoneSummary"
             android:title="@string/pref_title_ringtone"
             auto:extraRingtoneTitles="@array/extraRingtoneTitles"
@@ -30,7 +30,7 @@
             auto:ringtoneType="all"
             auto:showDefault="false"
             auto:showSilent="false" />
-        <kultalaaki.vpkapuri.SeekBarPreference
+        <kultalaaki.vpkapuri.misc.SeekBarPreference
             android:defaultValue="50"
             android:dialogMessage="@string/settings_dialog_message"
             android:icon="@drawable/ic_keyboard_arrow_right_white_24dp"
@@ -54,17 +54,17 @@
         android:title="Hälytysäänen voimakkuus ja värinä">
         <SwitchPreference
             android:defaultValue="true"
-            android:key="varina"
+            android:key="vibrate"
             android:summary="Käytetäänkö hälytyksen tullessa värinää."
             android:title="Värinä" />
         <ListPreference
-            android:key="vibrate_pattern"
             android:defaultValue="0"
-            android:dependency="varina"
-            android:title="Värinäkuvio"
-            android:summary="Valitse värinäkuvio eri vaihtoehdoista"
+            android:dependency="vibrate"
             android:entries="@array/vibrate"
-            android:entryValues="@array/vibratePatterns" />
+            android:entryValues="@array/vibratePatterns"
+            android:key="vibrate_pattern"
+            android:summary="Valitse värinäkuvio eri vaihtoehdoista"
+            android:title="Värinäkuvio" />
     </PreferenceCategory>
 
     <PreferenceCategory
@@ -80,11 +80,6 @@
             android:key="throughVibrateMode"
             android:summary="Laita tämä päälle jos haluat että hälytykset eivät tule värinätilan läpi."
             android:title="Värinätilan läpi" />
-        <SwitchPreference
-            android:defaultValue="false"
-            android:key="puhelu"
-            android:summary="Laita tämä päälle jos haluat käyttää sovelluksen ääniasetuksia myös puhelu hälytyksille. Muista myös Do Not Disturb asetus."
-            android:title="Puhelu hälytys" />
     </PreferenceCategory>
 
     <PreferenceCategory
@@ -93,9 +88,9 @@
         <SwitchPreference
             android:defaultValue="false"
             android:key="koneluku"
-            android:summary="Hälytysviesti puhutaan automaattisesti kun hälytys sivu aukaistaan ilmoituksen kautta tai kun hiljennetään jos automaattinen aukaisu käytössä."
+            android:summary="Hälytysviesti puhutaan automaattisesti kun hälytys sivu aukaistaan."
             android:title="Teksti puheeksi" />
-        <kultalaaki.vpkapuri.SeekBarPreference
+        <kultalaaki.vpkapuri.misc.SeekBarPreference
             android:defaultValue="50"
             android:dialogMessage="Teksti puheeksi äänenvoimakkuus"
             android:icon="@drawable/ic_keyboard_arrow_right_white_24dp"
@@ -116,14 +111,14 @@
             android:title="Lisäasetukset">
             <SwitchPreference
                 android:defaultValue="false"
-                android:key="OHTO"
+                android:key="boolean_vapepa_sound"
                 android:summary="OHTO Hälytyksille oma hälytysääni."
                 android:title="OHTO" />
-            <kultalaaki.vpkapuri.ExtraRingtonePreference
+            <kultalaaki.vpkapuri.misc.ExtraRingtonePreference
                 android:defaultValue="content://settings/system/notification_sound"
-                android:dependency="OHTO"
+                android:dependency="boolean_vapepa_sound"
                 android:icon="@drawable/ic_keyboard_arrow_right_white_24dp"
-                android:key="ringtoneOHTO"
+                android:key="ringtone_vapepa"
                 android:summary="@string/ringtoneSummary"
                 android:title="@string/pref_title_ringtone"
                 auto:extraRingtoneTitles="@array/extraRingtoneTitles"
@@ -133,14 +128,14 @@
                 auto:showSilent="false" />
             <SwitchPreference
                 android:defaultValue="false"
-                android:key="Ensivaste"
+                android:key="boolean_emergency_sound"
                 android:summary="Ensivaste hälytyksille oma hälytysääni."
                 android:title="Ensivaste" />
-            <kultalaaki.vpkapuri.ExtraRingtonePreference
+            <kultalaaki.vpkapuri.misc.ExtraRingtonePreference
                 android:defaultValue="content://settings/system/notification_sound"
-                android:dependency="Ensivaste"
+                android:dependency="boolean_emergency_sound"
                 android:icon="@drawable/ic_keyboard_arrow_right_white_24dp"
-                android:key="ringtoneEnsivaste"
+                android:key="ringtone_emergency"
                 android:summary="@string/ringtoneSummary"
                 android:title="@string/pref_title_ringtone"
                 auto:extraRingtoneTitles="@array/extraRingtoneTitles"
@@ -148,28 +143,6 @@
                 auto:ringtoneType="all"
                 auto:showDefault="false"
                 auto:showSilent="false" />
-            <SwitchPreference
-                android:defaultValue="false"
-                android:key="Puhelu"
-                android:summary="Puhelu hälytyksille oma hälytysääni."
-                android:title="Puhelu" />
-            <kultalaaki.vpkapuri.ExtraRingtonePreference
-                android:defaultValue="content://settings/system/notification_sound"
-                android:dependency="Puhelu"
-                android:icon="@drawable/ic_keyboard_arrow_right_white_24dp"
-                android:key="ringtonePuhelu"
-                android:summary="@string/ringtoneSummary"
-                android:title="@string/pref_title_ringtone"
-                auto:extraRingtoneTitles="@array/extraRingtoneTitles"
-                auto:extraRingtones="@array/extraRingtones"
-                auto:ringtoneType="all"
-                auto:showDefault="false"
-                auto:showSilent="false" />
-            <SwitchPreference
-                android:defaultValue="false"
-                android:key="stationboard_sounds"
-                android:summary="Asemataulu käytössä hälytysääni."
-                android:title="Asemataulu äänet" />
         </PreferenceScreen>
     </PreferenceCategory>
 

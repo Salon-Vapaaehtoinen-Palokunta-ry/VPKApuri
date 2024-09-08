@@ -3,7 +3,6 @@
   ~ Copyright (c) 2021. All rights reserved.
   ~ Last modified 3/20/21 12:06 PM
   -->
-<!--Todo check all and remove duplicates. Arrange all to some meaningful order-->
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <!--Mitä uutta-->
@@ -14,8 +13,23 @@
 
         <u><b>Versio 3.9\n\n</b></u>
 
+        Hälytyksen tullessa aukeaa automaattisesti uusi sivu missä on painikkeet avaamiseen
+        ja hiljentämiseen. Tämän avulla saadaan hälytysäänen voimakkuuden säätö toimimaan.\n\n
+
         Korjauksia sovelluksen kaatumisten vähentämiseksi.\n
-        Uusi logo\n
+        Mahdollisuus merkata yksiköt asetuksissa mitkä haluaa eroteltuina hälytyksen tullessa.
+        Aseta yksiköt siihen järjestykseen kun haluat niiden näkyvän.\n
+        Teksti puheeksi muutoksia: luetaan hälytystunnus, tekstiselvennys ja merkatut yksiköt.\n\n
+        VPK hälytys numerot ja Vapepa hälytys numerot eroteltu omiksi asetuksissa.\n
+        Virheilmoituksia paranneltu, esim. jos Do Not Disturb lupa ei ole annettu hälytyksen tullessa tulee tästä
+        ilmoitus joka kertoo missä vika.\n\n
+
+        Uusi logo\n\n
+
+        Hälytysäänen korjauksia:\n
+        Kesken puhelun tuleva hälytys pelkkä värinä\n
+        Muutamia korjauksia miten hälytysäänet tulevat kun muita ääniä on puhelimessa käytössä\n\n
+
         Pieniä ulkoasun muutoksia\n\n
 
     </string>
@@ -25,8 +39,23 @@
 
         <u><b>Versio 3.9\n\n</b></u>
 
+        Hälytyksen tullessa aukeaa automaattisesti uusi sivu missä on painikkeet avaamiseen
+        ja hiljentämiseen. Tämän avulla saadaan hälytysäänen voimakkuuden säätö toimimaan.\n\n
+
         Korjauksia sovelluksen kaatumisten vähentämiseksi.\n
-        Uusi logo\n
+        Mahdollisuus merkata yksiköt asetuksissa mitkä haluaa eroteltuina hälytyksen tullessa.
+        Aseta yksiköt siihen järjestykseen kun haluat niiden näkyvän.\n
+        Teksti puheeksi muutoksia: luetaan hälytystunnus, tekstiselvennys ja merkatut yksiköt.\n\n
+        VPK hälytys numerot ja Vapepa hälytys numerot eroteltu omiksi asetuksissa.\n
+        Virheilmoituksia paranneltu, esim. jos Do Not Disturb lupa ei ole annettu hälytyksen tullessa tulee tästä
+        ilmoitus joka kertoo missä vika.\n\n
+
+        Uusi logo\n\n
+
+        Hälytysäänen korjauksia:\n
+        Kesken puhelun tuleva hälytys pelkkä värinä\n
+        Muutamia korjauksia miten hälytysäänet tulevat kun muita ääniä on puhelimessa käytössä\n\n
+
         Pieniä ulkoasun muutoksia\n\n
 
         <u><b>Versio 3.81\n\n</b></u>
@@ -450,8 +479,8 @@
     - Soita ja hallinnoi puheluita lupaa tarvitaan hälytys sivun soita painikkeen toimintaan ja jos hälytykset tulevat puheluilla.\n
     - Mediatiedostojen käyttämistä tarvitaan hälytysäänen asettamista varten.\n
     - Tekstiviestien lähettäminen ja vastaanottaminen tarvitaan sms viesteillä tuleviin hälytyksiin ja sms pikaviestien lähettämiseen.</string>
-    <string name="testihalytysEricaEtuosa">TESTIHÄLYTYS; 411; C;</string>
-    <string name="testihalytysEricaTakaosa">; Satakunnankatu 3–5, Pori; Tämä on sovelluksen luoma testihälytysviesti soittoäänen ja ilmoitusten toiminnan testaamiseksi.</string>
+    <string name="testihalytysEricaEtuosa">TESTIHÄLYTYS; 402; B;</string>
+    <string name="testihalytysEricaTakaosa">; Satakunnankatu 3–5, Pori; Tämä on sovelluksen luoma testihälytysviesti soittoäänen ja ilmoitusten toiminnan testaamiseksi.; RPI7415, RPI741, RPI32, RPI766, RPI742</string>
     <string name="alkusanat">Alkusanat</string>
     <string name="h_lytys">Hälytys</string>
     <string name="asetukset">Asetukset</string>
@@ -508,6 +537,8 @@
     <string name="alarm">HÄLYTYS</string>
     <string name="tokeva">TOKEVA</string>
     <string name="app_logo">App logo</string>
+    <string name="palauta_tietokanta">Palauta tietokanta</string>
+    <string name="check_updates">Tarkista päivitykset</string>
 
     <!--Vibrate patterns-->
     <string-array name="vibrate">
@@ -524,4 +555,9 @@
         <item>3</item>
         <item>4</item>
     </string-array>
+    <string name="title_activity_alert">AlertActivity</string>
+    <string name="dummy_button">Dummy Button</string>
+    <string name="dummy_content">DUMMY\nCONTENT</string>
+    <string name="open">Avaa</string>
+    <string name="silence">Hiljennä</string>
 </resources>
